@@ -1,3 +1,5 @@
+//go:build upstream_sponsors
+
 package panel
 
 import (
