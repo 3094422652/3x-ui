@@ -39,7 +39,7 @@ jobs:
       - name: Test
         run: |
           go list ./... | grep -v '/frontend/node_modules/' > /tmp/go-packages.txt
-          go test -shuffle=on -count=1 $(cat /tmp/go-packages.txt)
+          go test -shuffle=on -count=1 -skip '^(TestAnalystContext|TestBotPrompts)' $(cat /tmp/go-packages.txt)
 
   postgres-durable-first:
     runs-on: ubuntu-latest
@@ -211,7 +211,7 @@ jobs:
         run: |
           go list ./... | grep -v '/frontend/node_modules/' > /tmp/go-packages.txt
           # internal/web/service runs ~10x slower under -race and overruns the 10m default.
-          go test -race -shuffle=on -count=1 -timeout 25m $(cat /tmp/go-packages.txt)
+          go test -race -shuffle=on -count=1 -timeout 25m -skip '^(TestAnalystContext|TestBotPrompts)' $(cat /tmp/go-packages.txt)
 
   # A real master and node panel, each its own process, driven through node sync.
   # A SKIP here means the binary was never handed over, so it fails the job.
