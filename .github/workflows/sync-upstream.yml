@@ -1,0 +1,110 @@
+name: Sync Upstream (Clean Fork)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Upstream ref to merge (e.g. main or a tag like v3.10.2)"
+        required: false
+        default: "main"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Merge upstream and enforce ad-free guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Merge upstream ref and sanitize sponsor/donate hooks
+        env:
+          UPSTREAM_REF: ${{ inputs.ref || 'main' }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/MHSanaei/3x-ui.git || true
+          git fetch upstream --tags
+
+          TARGET="upstream/${UPSTREAM_REF}"
+          if git rev-parse "refs/tags/${UPSTREAM_REF}" >/dev/null 2>&1; then
+            TARGET="refs/tags/${UPSTREAM_REF}"
+          fi
+
+          git merge --no-commit --no-ff "$TARGET" || true
+
+          # Always keep sponsor components deleted
+          git rm -rf --ignore-unmatch frontend/src/components/sponsor frontend/src/pages/sponsors
+
+          # Ensure sponsor.go has the exclusion build tag
+          if [ -f internal/web/service/panel/sponsor.go ]; then
+            head -n 1 internal/web/service/panel/sponsor.go | grep -q '^//go:build upstream_sponsors$'
+          fi
+          if [ -f internal/web/service/panel/sponsor_test.go ]; then
+            head -n 1 internal/web/service/panel/sponsor_test.go | grep -q '^//go:build upstream_sponsors$'
+          fi
+
+          # Strip menu.donate, menu.sponsors, pages.sponsors from all translation JSON files
+          python3 - <<'PY'
+          import glob, json
+          for f in sorted(glob.glob("internal/web/translation/*.json")):
+              with open(f, "r", encoding="utf-8") as fp:
+                  data = json.load(fp)
+              if isinstance(data.get("menu"), dict):
+                  data["menu"].pop("donate", None)
+                  data["menu"].pop("sponsors", None)
+              if isinstance(data.get("pages"), dict):
+                  data["pages"].pop("sponsors", None)
+              with open(f, "w", encoding="utf-8", newline="\n") as fp:
+                  json.dump(data, fp, ensure_ascii=False, indent=2)
+                  fp.write("\n")
+          PY
+
+          git add internal/web/translation/*.json
+
+          # Abort if any unmerged conflicts remain so manual review can handle them
+          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+            echo "Unresolved conflicts require manual resolution:" >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 1
+          fi
+
+          # Fail closed if sponsor.go would be compiled
+          if go list -f '{{join .GoFiles "\n"}}' ./internal/web/service/panel | grep -q '^sponsor\.go$'; then
+            echo "Sponsor backend must not be compiled into fork releases" >&2
+            exit 1
+          fi
+
+      - name: Verify frontend contract tests & build
+        working-directory: frontend
+        run: |
+          npm ci
+          npx vitest run src/test/navigation-contract.test.tsx src/test/i18n-dead-keys.test.ts
+          npm run build
+
+      - name: Commit and push if updated
+        run: |
+          if git diff --cached --quiet && git diff --quiet; then
+            echo "Already up to date with upstream."
+            exit 0
+          fi
+          git commit -m "chore: sync upstream (${{ inputs.ref || 'main' }}) with ad-free guardrails"
+          git push origin HEAD:main

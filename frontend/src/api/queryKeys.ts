@@ -10,6 +10,7 @@ export const keys = {
   hosts: {
     root: () => ['hosts'] as const,
     list: () => ['hosts', 'list'] as const,
+    raw: () => ['hosts', 'raw'] as const,
     byInbound: (inboundId: number) => ['hosts', 'byInbound', inboundId] as const,
     tags: () => ['hosts', 'tags'] as const,
   },

@@ -137,7 +137,7 @@ jobs:
           cd x-ui/bin
 
           # Download dependencies
-          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v26.9.30/"
+          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v26.10.21/"
           if [ "${{ matrix.platform }}" == "amd64" ]; then
             fetch ${Xray_URL}Xray-linux-64.zip
             unzip Xray-linux-64.zip
@@ -300,7 +300,7 @@ jobs:
           cd x-ui\bin
 
           # Download Xray for Windows
-          $Xray_URL = "https://github.com/XTLS/Xray-core/releases/download/v26.9.30/"
+          $Xray_URL = "https://github.com/XTLS/Xray-core/releases/download/v26.10.21/"
           Invoke-WebRequest @retry -Uri "${Xray_URL}Xray-windows-64.zip" -OutFile "Xray-windows-64.zip"
           Expand-Archive -Path "Xray-windows-64.zip" -DestinationPath .
           Remove-Item "Xray-windows-64.zip"
@@ -378,12 +378,7 @@ jobs:
           test "${#assets[@]}" -eq 16
           (cd stable-artifacts && sha256sum --check *.sha256)
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            if [[ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]]; then
-              echo "Release $TAG is already published; use a new version to replace binaries."
-              exit 1
-            fi
-          else
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --draft --verify-tag --title "$TAG - Clean fork" \
               --notes "Stable release of this fork. Removes project sponsor and donation content and uses 3094422652/3x-ui for installation and updates. Includes Linux and Windows builds with SHA-256 checksums."
           fi

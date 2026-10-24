@@ -126,6 +126,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapVlessField": {
         "type": "string"
       },
+      "nodeDownThreshold": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
       "outboundDownThreshold": {
         "maximum": 100,
         "minimum": 1,
@@ -215,6 +220,9 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "subClashPath": {
         "type": "string"
+      },
+      "subClashRemoteDNS": {
+        "type": "boolean"
       },
       "subClashRules": {
         "type": "string"
@@ -315,6 +323,10 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "subHideSettings": {
         "type": "boolean"
+      },
+      "subHostSortMode": {
+        "example": "inbound-first",
+        "type": "string"
       },
       "subIncyAnnounceUrl": {
         "type": "string"
@@ -610,6 +622,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapUserAttr",
       "ldapUserFilter",
       "ldapVlessField",
+      "nodeDownThreshold",
       "outboundDownThreshold",
       "pageSize",
       "panelOutbound",
@@ -636,6 +649,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "subClashEnable",
       "subClashEnableRouting",
       "subClashPath",
+      "subClashRemoteDNS",
       "subClashRules",
       "subClashURI",
       "subClashUserAgentRegex",
@@ -669,6 +683,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "subHappTunMode",
       "subHappTunType",
       "subHideSettings",
+      "subHostSortMode",
       "subIncyAnnounceUrl",
       "subIncyAppAutoDetect",
       "subIncyBannerBgColor",
@@ -902,6 +917,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapVlessField": {
         "type": "string"
       },
+      "nodeDownThreshold": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
       "outboundDownThreshold": {
         "maximum": 100,
         "minimum": 1,
@@ -991,6 +1011,9 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "subClashPath": {
         "type": "string"
+      },
+      "subClashRemoteDNS": {
+        "type": "boolean"
       },
       "subClashRules": {
         "type": "string"
@@ -1091,6 +1114,10 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "subHideSettings": {
         "type": "boolean"
+      },
+      "subHostSortMode": {
+        "example": "inbound-first",
+        "type": "string"
       },
       "subIncyAnnounceUrl": {
         "type": "string"
@@ -1394,6 +1421,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapUserAttr",
       "ldapUserFilter",
       "ldapVlessField",
+      "nodeDownThreshold",
       "outboundDownThreshold",
       "pageSize",
       "panelOutbound",
@@ -1420,6 +1448,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "subClashEnable",
       "subClashEnableRouting",
       "subClashPath",
+      "subClashRemoteDNS",
       "subClashRules",
       "subClashURI",
       "subClashUserAgentRegex",
@@ -1453,6 +1482,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "subHappTunMode",
       "subHappTunType",
       "subHideSettings",
+      "subHostSortMode",
       "subIncyAnnounceUrl",
       "subIncyAppAutoDetect",
       "subIncyBannerBgColor",
@@ -1674,6 +1704,17 @@ export const SCHEMAS: Record<string, unknown> = {
         "description": "Auth password (Hysteria)",
         "type": "string"
       },
+      "clientHostRuleIds": {
+        "description": "ClientHostRuleIds binds the client to these host rules, one link each; nil preserves, empty\nclears, and bindings with no usable host leave that inbound out of the subscription.",
+        "example": [
+          1,
+          2
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
       "comment": {
         "description": "Client comment",
         "type": "string"
@@ -1713,9 +1754,15 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "string"
       },
       "keepAlive": {
-        "description": "Seconds between PersistentKeepalive packets; 0 sends none, omit to keep the stored value",
-        "nullable": true,
-        "type": "integer"
+        "description": "Numeric values or AmneziaWG ranges; 0 disables, omission preserves.",
+        "oneOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "string"
+          }
+        ]
       },
       "limitIp": {
         "description": "IP limit for this client",
@@ -1905,6 +1952,16 @@ export const SCHEMAS: Record<string, unknown> = {
       "auth": {
         "type": "string"
       },
+      "clientHostRuleIds": {
+        "example": [
+          1,
+          2
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
       "comment": {
         "type": "string"
       },
@@ -1935,7 +1992,15 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "integer"
       },
       "keepAlive": {
-        "type": "integer"
+        "description": "Numeric values or AmneziaWG ranges.",
+        "oneOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "string"
+          }
+        ]
       },
       "limitHwid": {
         "type": "integer"
@@ -2712,6 +2777,10 @@ export const SCHEMAS: Record<string, unknown> = {
         "minimum": 0,
         "type": "integer"
       },
+      "randomCount": {
+        "example": 1,
+        "type": "integer"
+      },
       "remark": {
         "example": "cdn-front",
         "maxLength": 256,
@@ -2736,6 +2805,15 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "sni": {
         "type": "string"
+      },
+      "sniSharedRandom": {
+        "type": "boolean"
+      },
+      "snis": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       },
       "sockoptParams": {},
       "sortOrder": {
@@ -2784,11 +2862,13 @@ export const SCHEMAS: Record<string, unknown> = {
       "path",
       "pinnedPeerCertSha256",
       "port",
+      "randomCount",
       "remark",
       "security",
       "serverDescription",
       "shuffleHost",
       "sni",
+      "sniSharedRandom",
       "sockoptParams",
       "sortOrder",
       "tags",
@@ -2893,6 +2973,11 @@ export const SCHEMAS: Record<string, unknown> = {
         "minimum": 0,
         "type": "integer"
       },
+      "randomCount": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
       "remark": {
         "maxLength": 256,
         "type": "string"
@@ -2915,6 +3000,15 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "sni": {
         "type": "string"
+      },
+      "sniSharedRandom": {
+        "type": "boolean"
+      },
+      "snis": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       },
       "sockoptParams": {
         "type": "string"
@@ -2958,11 +3052,14 @@ export const SCHEMAS: Record<string, unknown> = {
       "path",
       "pinnedPeerCertSha256",
       "port",
+      "randomCount",
       "remark",
       "security",
       "serverDescription",
       "shuffleHost",
       "sni",
+      "sniSharedRandom",
+      "snis",
       "sockoptParams",
       "sortOrder",
       "tags",
@@ -3638,6 +3735,13 @@ export const SCHEMAS: Record<string, unknown> = {
       "transitive": {
         "type": "boolean"
       },
+      "unavailableMetrics": {
+        "description": "Nil on legacy rows and responses: zero remains a valid measured value.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
       "updatedAt": {
         "example": 1700000000,
         "format": "int64",
@@ -3946,6 +4050,12 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": false,
         "type": "boolean"
       },
+      "unavailableMetrics": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
       "updatedAt": {
         "example": 1700003600,
         "format": "int64",
@@ -4157,6 +4267,12 @@ export const SCHEMAS: Record<string, unknown> = {
       "status": {
         "example": "online",
         "type": "string"
+      },
+      "unavailableMetrics": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       },
       "uptimeSecs": {
         "example": 86400,
@@ -4538,6 +4654,35 @@ export const SCHEMAS: Record<string, unknown> = {
       "sortOrder",
       "strategy",
       "updatedAt"
+    ],
+    "type": "object"
+  },
+  "TgBotCapabilities": {
+    "description": "TgBotCapabilities is the browser-safe shape of the bot's own capabilities.",
+    "properties": {
+      "groupPrivacy": {
+        "description": "GroupPrivacy off means the bot reads every group message; when it is on,\na bare /start in a group is invisible to the bot.",
+        "example": false,
+        "type": "boolean"
+      },
+      "inlineEnabled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "running": {
+        "example": true,
+        "type": "boolean"
+      },
+      "username": {
+        "example": "xui_bot",
+        "type": "string"
+      }
+    },
+    "required": [
+      "groupPrivacy",
+      "inlineEnabled",
+      "running",
+      "username"
     ],
     "type": "object"
   },

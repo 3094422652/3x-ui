@@ -10,25 +10,61 @@ COPY internal/web/translation /src/internal/web/translation
 RUN npm run build
 
 # ========================================================
-# Stage: Builder
+# Stage: Builder (Cross-compiled on native $BUILDPLATFORM)
 # ========================================================
-FROM golang:1.27-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27 AS builder
 WORKDIR /app
-ARG TARGETARCH
 
-RUN apk --no-cache --update add \
-  build-base \
-  gcc \
-  curl \
-  unzip
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  unzip \
+  xz-utils \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
 COPY --from=frontend /src/internal/web/dist ./internal/web/dist
 
-ENV CGO_ENABLED=1
-ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
-RUN go build -ldflags "-w -s" -o build/x-ui main.go
-RUN ./DockerInit.sh "$TARGETARCH"
+ARG BUILDARCH
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+RUN set -e; \
+  CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 15"; \
+  export CGO_ENABLED=1; \
+  export CGO_CFLAGS="-D_LARGEFILE64_SOURCE"; \
+  export GOOS=linux; \
+  case "${TARGETARCH}/${TARGETVARIANT}" in \
+    amd64/*) INIT_ARCH="amd64"; BOOTLIN_ARCH="x86-64"; export GOARCH=amd64 ;; \
+    arm64/*) INIT_ARCH="arm64"; BOOTLIN_ARCH="aarch64"; export GOARCH=arm64 ;; \
+    arm/v7|arm/) INIT_ARCH="armv7"; BOOTLIN_ARCH="armv7-eabihf"; export GOARCH=arm GOARM=7 ;; \
+    arm/v6) INIT_ARCH="armv6"; BOOTLIN_ARCH="armv6-eabihf"; export GOARCH=arm GOARM=6 ;; \
+    386/*) INIT_ARCH="386"; BOOTLIN_ARCH="x86-i686"; export GOARCH=386 ;; \
+    *) echo "Unsupported target platform: ${TARGETARCH}/${TARGETVARIANT}" >&2; exit 1 ;; \
+  esac; \
+  if [ "$BUILDARCH" = "amd64" ]; then \
+    TARBALL_BASE="https://toolchains.bootlin.com/downloads/releases/toolchains/$BOOTLIN_ARCH/tarballs/"; \
+    TARBALL_URL=$(curl -fsSL $CURL_RETRY "$TARBALL_BASE" | grep -oE "${BOOTLIN_ARCH}--musl--stable-[^\"]+\\.tar\\.xz" | sort -r | head -n1); \
+    [ -z "$TARBALL_URL" ] && { echo "Failed to locate Bootlin musl toolchain for arch=$BOOTLIN_ARCH" >&2; exit 1; }; \
+    mkdir -p /tmp/toolchain && cd /tmp/toolchain; \
+    curl -fL -sS $CURL_RETRY -o toolchain.tar.xz "$TARBALL_BASE/$TARBALL_URL"; \
+    tar -xf toolchain.tar.xz; \
+    TOOLCHAIN_DIR=$(find . -maxdepth 1 -type d -name "${BOOTLIN_ARCH}--musl--stable-*" | head -n1); \
+    export PATH="$(realpath "$TOOLCHAIN_DIR")/bin:$PATH"; \
+    export CC=$(realpath "$(find "$TOOLCHAIN_DIR/bin" -name '*-gcc.br_real' -type f -executable | head -n1)"); \
+    [ -z "$CC" ] && { echo "No gcc.br_real found in $TOOLCHAIN_DIR/bin" >&2; exit 1; }; \
+    cd /app; \
+  fi; \
+  if go list -f '{{join .GoFiles "\n"}}' ./internal/web/service/panel | grep -q '^sponsor\.go$'; then \
+    echo "Sponsor backend must not be compiled into fork releases" >&2; \
+    exit 1; \
+  fi; \
+  mkdir -p build; \
+  go build -ldflags "-w -s -linkmode external -extldflags '-static'" -o build/x-ui main.go; \
+  rm -rf /tmp/toolchain; \
+  chmod +x ./DockerInit.sh; \
+  ./DockerInit.sh "$INIT_ARCH"
 
 # ========================================================
 # Stage: Final Image of 3x-ui
@@ -49,7 +85,6 @@ COPY --from=builder /app/build/ /app/
 COPY --from=builder /app/DockerEntrypoint.sh /app/
 COPY --from=builder /app/x-ui.sh /usr/bin/x-ui
 COPY --from=builder /app/internal/web/translation /app/internal/web/translation
-
 
 # Configure fail2ban
 RUN rm -f /etc/fail2ban/jail.d/alpine-ssh.conf \

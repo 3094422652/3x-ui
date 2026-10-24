@@ -483,6 +483,21 @@ _install_xui_service_unit() {
     return 0
 }
 
+# resolve_latest_tag prints the latest stable release tag. It prefers the web
+# releases/latest redirect, which is not subject to the unauthenticated API's
+# 60 req/h-per-IP limit that trips shared CI/CGNAT addresses, and falls back to
+# the API.
+resolve_latest_tag() {
+    local url tag
+    url=$(${curl_bin} -sSLI -o /dev/null -w '%{url_effective}' --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 60 "https://github.com/3094422652/3x-ui/releases/latest" 2>/dev/null)
+    tag=${url##*/tag/}
+    if [[ "$tag" != "$url" && -n "$tag" && "$tag" != "latest" ]]; then
+        echo "$tag"
+        return 0
+    fi
+    ${curl_bin} -Ls --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 60 "https://api.github.com/repos/3094422652/3x-ui/releases/latest" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+}
+
 # Older tags predate some of these files (x-ui.rc arrived in v2.8.4). Serving
 # main's copy against an old binary is the mismatch this pinning exists to
 # prevent, so probe before the old install is removed and refuse the tag.
@@ -518,7 +533,7 @@ update_x-ui() {
         tag_version="${XUI_UPDATE_TAG}"
         echo -e "${green}Using update tag: ${tag_version}${plain}"
     else
-        tag_version=$(${curl_bin} -Ls "https://api.github.com/repos/3094422652/3x-ui/releases/latest" 2> /dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        tag_version=$(resolve_latest_tag)
         if [[ ! -n "$tag_version" ]]; then
             _fail "ERROR: Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later"
         fi
